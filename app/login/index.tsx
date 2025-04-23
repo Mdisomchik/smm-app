@@ -1,21 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Button, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { googleAuthConfig } from '../../config/authConfig';
 
-export default function LoginScreen() {
+export default async function LoginScreen() {
   const [userInfo, setUserInfo] = useState<any>(null);
   const [emails, setEmails] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const router = useRouter();
 
-  const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
-
+  const redirectUri = 'https://auth.expo.io/@madisomchik/smm-app';
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    setRedirecting(true); 
 
     const request = new AuthSession.AuthRequest({
       clientId: googleAuthConfig.androidClientId,
@@ -37,11 +38,13 @@ export default function LoginScreen() {
 
       await AsyncStorage.setItem('access_token', accessToken);
       await fetchUserInfo(accessToken);
-      await showEmails(accessToken);
+      await fetchEmails(accessToken); // Fetch the emails once the access token is retrieved
 
-      router.replace('/(tabs)/explore'); // Redirect to tab/home
+      setRedirecting(false);
+      router.replace('/dashboard'); 
     } else {
       console.log('Login canceled or failed:', result);
+      setRedirecting(false);
     }
 
     setLoading(false);
@@ -55,17 +58,21 @@ export default function LoginScreen() {
     setUserInfo(user);
   };
 
+  // Fetch the email list using the Gmail API
   const fetchEmails = async (accessToken: string) => {
-    const res = await fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5',
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
-    );
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
     const data = await res.json();
-    return data.messages || [];
+    if (data.messages) {
+      const emailDetails = await Promise.all(
+        data.messages.map((msg: { id: string }) => fetchEmailDetails(msg.id, accessToken))
+      );
+      setEmails(emailDetails);
+    }
   };
 
+  // Fetch individual email details (subject, snippet, etc.)
   const fetchEmailDetails = async (id: string, accessToken: string) => {
     const res = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject`,
@@ -81,19 +88,33 @@ export default function LoginScreen() {
       snippet: message.snippet,
     };
   };
+  const request = new AuthSession.AuthRequest({
+    clientId: googleAuthConfig.androidClientId,
+    scopes: googleAuthConfig.scopes,
+    redirectUri,
+  });
 
-  const showEmails = async (accessToken: string) => {
-    const ids = await fetchEmails(accessToken);
-    const detailed = await Promise.all(
-      ids.map((msg: { id: string }) => fetchEmailDetails(msg.id, accessToken))
-    );
-    setEmails(detailed);
+  const discovery = {
+    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenEndpoint: 'https://oauth2.googleapis.com/token',
   };
+
+  await request.makeAuthUrlAsync(discovery);
+
+  const result = await request.promptAsync(discovery);
+
+  console.log('Auth result:', result);
+  
 
   return (
     <View style={styles.container}>
-      {loading && <ActivityIndicator size="large" />}
-      {!userInfo && !loading && (
+      {redirecting && (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color="#0000ff" />
+          <Text style={styles.loadingText}>Redirecting, please wait...</Text>
+        </View>
+      )}
+      {!redirecting && !userInfo && !loading && (
         <Button title="Sign in with Google" onPress={handleGoogleLogin} />
       )}
       {userInfo && (
@@ -101,12 +122,16 @@ export default function LoginScreen() {
           <Text style={styles.text}>Welcome {userInfo.name} 👋</Text>
           <Text style={styles.email}>{userInfo.email}</Text>
           <Text style={styles.sectionTitle}>Your Emails:</Text>
-          {emails.map((email) => (
-            <View key={email.id} style={styles.emailCard}>
-              <Text style={styles.subject}>{email.subject}</Text>
-              <Text style={styles.snippet}>{email.snippet}</Text>
-            </View>
-          ))}
+          {emails.length > 0 ? (
+            emails.map((email) => (
+              <View key={email.id} style={styles.emailCard}>
+                <Text style={styles.subject}>{email.subject}</Text>
+                <Text style={styles.snippet}>{email.snippet}</Text>
+              </View>
+            ))
+          ) : (
+            <Text>No emails found.</Text>
+          )}
         </ScrollView>
       )}
     </View>
@@ -126,4 +151,16 @@ const styles = StyleSheet.create({
   },
   subject: { fontWeight: 'bold', fontSize: 15 },
   snippet: { fontSize: 13, color: '#444' },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  loadingText: { marginTop: 10, fontSize: 16 },
 });

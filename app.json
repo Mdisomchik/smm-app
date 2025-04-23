@@ -36,6 +36,15 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "expoClientId": "106794135380-9j6ahfrekahtdoom51rlcq44ltd7empk.apps.googleusercontent.com",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "9fcb962b-3ae9-4af1-ac2d-aecb8943e35d"
+      }
     }
   }
 }
