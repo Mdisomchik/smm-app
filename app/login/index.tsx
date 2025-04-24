@@ -9,17 +9,13 @@ export default async function LoginScreen() {
   const [userInfo, setUserInfo] = useState<any>(null);
   const [emails, setEmails] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
   const router = useRouter();
 
   const redirectUri = 'https://auth.expo.io/@madisomchik/smm-app';
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setRedirecting(true); 
-
-    const request = new AuthSession.AuthRequest({
-      clientId: googleAuthConfig.androidClientId,
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: googleAuthConfig.webClientId,
       scopes: googleAuthConfig.scopes,
       redirectUri,
     });
@@ -58,7 +54,6 @@ export default async function LoginScreen() {
     setUserInfo(user);
   };
 
-  // Fetch the email list using the Gmail API
   const fetchEmails = async (accessToken: string) => {
     const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5', {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -72,7 +67,6 @@ export default async function LoginScreen() {
     }
   };
 
-  // Fetch individual email details (subject, snippet, etc.)
   const fetchEmailDetails = async (id: string, accessToken: string) => {
     const res = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject`,
@@ -88,23 +82,6 @@ export default async function LoginScreen() {
       snippet: message.snippet,
     };
   };
-  const request = new AuthSession.AuthRequest({
-    clientId: googleAuthConfig.androidClientId,
-    scopes: googleAuthConfig.scopes,
-    redirectUri,
-  });
-
-  const discovery = {
-    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  };
-
-  await request.makeAuthUrlAsync(discovery);
-
-  const result = await request.promptAsync(discovery);
-
-  console.log('Auth result:', result);
-  
 
   return (
     <View style={styles.container}>
