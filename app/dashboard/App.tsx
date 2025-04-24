@@ -1,84 +1,57 @@
-// app/dashboard/index.tsx
-import React from 'react';
-import { View, Text, StyleSheet, Button, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuth } from '../_layout'; // Adjust path if needed
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DashboardScreen = () => {
-  const router = useRouter();
-  const { setIsAuthenticated } = useAuth();
+export default function Dashboard() {
+  const [emails, setEmails] = useState<any[]>([]);
 
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem('access_token');
-      setIsAuthenticated(false);
-      router.replace('/login/LoginScreen');
-    } catch (error) {
-      console.error('Error logging out:', error);
-      Alert.alert('Logout Error', 'Failed to logout.');
-    }
-  };
+  useEffect(() => {
+    const fetchEmails = async () => {
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) return;
+
+      const res = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5',
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const { messages } = await res.json();
+      const details = await Promise.all(
+        messages.map((msg: any) =>
+          fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(res => res.json())
+        )
+      );
+      setEmails(details);
+    };
+
+    fetchEmails();
+  }, []);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome to the Dashboard!</Text>
-      <Text style={styles.subtitle}>This is your main application area.</Text>
-
-      <View style={styles.featureCard}>
-        <Text style={styles.featureTitle}>Check Your Emails</Text>
-       <Button title="Go to Emails" onPress={() => router.push} />
-      </View>
-
-      <View style={styles.featureCard}>
-        <Text style={styles.featureTitle}>Manage Profile</Text>
-        <Button title="Edit Profile" onPress={() => router.push} />
-      </View>
-
-      <Button title="Logout" onPress={handleLogout} />
-    </View>
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>Your Emails:</Text>
+      {emails.map((email, index) => (
+        <View key={index} style={styles.emailCard}>
+          <Text style={styles.subject}>
+            {email.payload?.headers.find((h: any) => h.name === 'Subject')?.value || '(No Subject)'}
+          </Text>
+          <Text style={styles.snippet}>{email.snippet}</Text>
+        </View>
+      ))}
+    </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f4f4f4',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 30,
-    textAlign: 'center',
-  },
-  featureCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 20,
-    marginBottom: 20,
-    width: '90%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  featureTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  container: { flex: 1, padding: 20 },
+  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+  emailCard: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 10,
     marginBottom: 10,
-    color: '#333',
   },
+  subject: { fontWeight: 'bold' },
+  snippet: { color: '#666' },
 });
-
-export default DashboardScreen;

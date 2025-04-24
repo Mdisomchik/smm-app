@@ -1,65 +1,84 @@
-// app/layout.tsx
+// app/_layout.tsx
 import { Slot, useRouter, useSegments } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useEffect, useState, createContext, useContext, useRef } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 
-// Create an Auth Context
+// Auth context
 const AuthContext = createContext<{
   isAuthenticated: boolean;
-  setIsAuthenticated: (value: boolean) => void;
+  setIsAuthenticated: (val: boolean) => void;
 } | null>(null);
 
-// Auth Provider Component
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};
+
+const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkToken = async () => {
       const token = await AsyncStorage.getItem('access_token');
       setIsAuthenticated(!!token);
-      setIsLoading(false);
+      setLoading(false);
     };
-
     checkToken();
   }, []);
 
-  if (isLoading) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
+        <ActivityIndicator size="large" />
       </View>
     );
   }
 
-export default function RootLayout() {
+  return (
+    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+const RootLayoutNavigator = () => {
   const { isAuthenticated } = useAuth();
-  const router = useRouter();
   const segments = useSegments();
+  const router = useRouter();
+  const hasNavigated = useRef(false);
 
   useEffect(() => {
-      const inAuthGroup = segments[0] === 'login';
-  
-      if (!isAuthenticated && !inAuthGroup) {
-        router.replace('/login/LoginScreen');
-      } else if (isAuthenticated && inAuthGroup) {
-        router.replace('/dashboard/App');
-      }
-    }, [isAuthenticated, segments, router]);
+    if (!segments || hasNavigated.current) return;
 
-  return null; // Slot is rendered within AuthProvider
+    const inLoginGroup = segments[0] === 'login';
+
+    if (!isAuthenticated && !inLoginGroup) {
+      router.replace('/login/LoginScreen');
+      hasNavigated.current = true;
+    } else if (isAuthenticated && inLoginGroup) {
+      router.replace('/dashboard/App');
+      hasNavigated.current = true;
+    }
+  }, [isAuthenticated, segments]);
+
+  return <Slot />;
+};
+
+export default function Layout() {
+  return (
+    <AuthProvider>
+      <RootLayoutNavigator />
+    </AuthProvider>
+  );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f0f0f0', // Light background color for the app
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff', // White background for loading screen
   },
 });
