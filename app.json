@@ -9,13 +9,15 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.madisomshik.smmapp"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.madisomshik.smmapp"
     },
     "web": {
       "bundler": "metro",
@@ -46,5 +48,11 @@
         "projectId": "9fcb962b-3ae9-4af1-ac2d-aecb8943e35d"
       }
     }
-  }
+  },
+  "@react-native-google-signin/google-signin": {
+    "IosClientUrl":"com.googleusercontent.apps.106794135380-uclnd014005k85fdc6lsmk1ga6983o7l",
+    "WebClientId":"106794135380-9j6ahfrekahtdoom51rlcq44ltd7empk.apps.googleusercontent.com",
+    "WebClientSecret":"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",
+    "AndroidClientId":"106794135380-8hekkhsobnahlqmjm749l0ssg4tbnt0v.apps.googleusercontent.com"
+}
 }
